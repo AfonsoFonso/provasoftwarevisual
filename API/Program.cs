@@ -4,10 +4,17 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDataContext>();
+builder.Services.AddCors(options =>
+    options.AddPolicy("Acesso Total",
+        configs => configs
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod())
+);
 
 var app = builder.Build();
 
-app.MapGet("/", () => "COLOQUE O SEU NOME");
+app.MapGet("/", () => "Bernardo Fofano");
 
 //ENDPOINTS DE TAREFA
 //GET: http://localhost:5273/api/tarefas/listar
@@ -31,19 +38,47 @@ app.MapPost("/api/tarefas/cadastrar", ([FromServices] AppDataContext ctx, [FromB
 //PUT: http://localhost:5273/tarefas/alterar/{id}
 app.MapPut("/api/tarefas/alterar/{id}", ([FromServices] AppDataContext ctx, [FromRoute] string id) =>
 {
-    //Implementar a alteração do status da tarefa
+    var tarefa = ctx.Tarefas.Find(id);
+    if (tarefa == null)
+    {
+        return Results.NotFound();
+    }
+
+    if (tarefa.Status == "Não iniciada")
+    {
+        tarefa.Status = "Em andamento";
+    }
+    else if (tarefa.Status == "Em andamento")
+    {
+        tarefa.Status = "Concluída";
+    }
+
+    ctx.Update(tarefa);
+    ctx.SaveChanges();
+    return Results.Ok(tarefa);
 });
 
 //GET: http://localhost:5273/tarefas/naoconcluidas
 app.MapGet("/api/tarefas/naoconcluidas", ([FromServices] AppDataContext ctx) =>
 {
-    //Implementar a listagem de tarefas não concluídas
+    var tarefasNaoConcluidas = ctx.Tarefas.Where(t => t.Status != "Concluída").ToList();
+    if (tarefasNaoConcluidas.Any())
+    {
+        return Results.Ok(tarefasNaoConcluidas);
+    }
+    return Results.NotFound("Nenhuma tarefa não concluída encontrada");
 });
+
 
 //GET: http://localhost:5273/tarefas/concluidas
 app.MapGet("/api/tarefas/concluidas", ([FromServices] AppDataContext ctx) =>
 {
-    //Implementar a listagem de tarefas concluídas
+    var tarefasConcluidas = ctx.Tarefas.Where(t => t.Status == "Concluída").ToList();
+    if (tarefasConcluidas.Any())
+    {
+        return Results.Ok(tarefasConcluidas);
+    }
+    return Results.NotFound("Nenhuma tarefa concluída encontrada");
 });
-
+app.UseCors("Acesso Total");
 app.Run();
